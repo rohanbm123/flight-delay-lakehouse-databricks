@@ -42,6 +42,7 @@ BTS Flight Data (CSV, monthly)
 | Governance | Unity Catalog (lineage, access grants, table/column documentation) |
 | Orchestration | Databricks Workflows (multi-task job with dependencies) |
 | Consumption | Databricks SQL / Lakeview Dashboard |
+| ML | Spark MLlib (Logistic Regression), MLflow tracking |
 | Compute | Databricks Free Edition (serverless) |
 
 ---
@@ -106,6 +107,34 @@ Four visuals built on the gold layer:
 
 ---
 
+## Delay Risk Model (Stretch Goal)
+
+A logistic regression model (Spark MLlib) trained on the silver layer to predict delay probability from carrier, origin airport, departure hour, day of week, weekend flag, and distance.
+
+**Results:**
+| Metric | Value |
+|---|---|
+| AUC (area under ROC) | 0.66 |
+| Accuracy | 78.6% |
+
+Accuracy alone is not the meaningful metric here — roughly 77% of flights are naturally on-time, so a model that always predicts "on-time" would already score ~77% while learning nothing. AUC of 0.66 (vs. 0.50 for random) is the metric that confirms the model is genuinely separating delayed from on-time flights using only six basic features, none of which include weather or mechanical/crew data.
+
+**Validation against known patterns:** scoring a mixed set of known low- and high-risk carrier/airport/time combinations (pulled independently from the gold-layer aggregates) showed the model correctly flagging the two worst-known combinations — Allegiant (G4) out of CKB and Toledo at 9pm — as high delay risk, with predicted probabilities climbing smoothly from 9% (Hawaiian, calm morning) to 66% (Allegiant, CKB, evening):
+
+| Carrier | Origin | Hour | Predicted Delay Risk |
+|---|---|---|---|
+| HA | HNL | 9am | 9.0% |
+| OO | ATL | 10am | 13.1% |
+| DL | ORD | 6pm | 32.0% |
+| AA | DFW | 5pm | 36.5% |
+| B6 | BOS | 8pm | 41.8% |
+| G4 | TOL | 9pm | **55.0%** |
+| G4 | CKB | 8pm | **66.4%** |
+
+Predictions were materialized to `flights_project.gold.delay_risk_predictions` for downstream querying, and training runs were tracked via MLflow.
+
+---
+
 ## Repository Structure
 
 ```
@@ -114,7 +143,8 @@ flight-delay-lakehouse-databricks/
 ├── notebooks/
 │   ├── 01_bronze_ingest.py
 │   ├── 02_silver_transform.py
-│   └── 03_gold_aggregates.py
+│   ├── 03_gold_aggregates.py
+│   └── 04_ml_delay_risk.py
 └── screenshots/
     ├── lineage.jpeg
     ├── job_runs.jpeg
@@ -131,6 +161,7 @@ flight-delay-lakehouse-databricks/
 - **Governance-first design** — Unity Catalog lineage, access boundaries, and documentation built in from the start, not bolted on
 - **Orchestration** — a working, scheduled, multi-task pipeline with dependency management, not disconnected notebooks
 - **Business-facing output** — gold-layer tables designed around real questions (which carriers are reliable, which routes/hours carry the most risk), not just raw aggregation
+- **ML integration on top of the lakehouse** — a delay-risk model trained directly on silver, validated against independently-derived gold-layer patterns, with predictions materialized as a queryable table
 
 ---
 
