@@ -1,5 +1,3 @@
-# flight-delay-lakehouse-databricks
-
 # Flight Delay & Airline Performance Analytics — Databricks Lakehouse
 
 An end-to-end data engineering pipeline on Databricks that ingests, cleans, and analyzes 2.3M+ US domestic flight records to surface airline reliability, delay risk, and cascading delay patterns — built on a medallion (bronze/silver/gold) lakehouse architecture with Unity Catalog governance and automated orchestration.
@@ -81,7 +79,7 @@ Built with Unity Catalog as a first-class concern, not an afterthought:
 - **Documentation** — every table carries a `COMMENT` describing its purpose, refresh source, and intended consumers
 - **Governed file access** — raw files land in Unity Catalog Volumes rather than ungoverned cloud paths; ingestion code uses `_metadata.file_path` rather than deprecated file-system functions blocked under UC
 
-![Lineage Graph](screenshots/lineage_graph.png)
+![Lineage Graph](screenshots/lineage.jpeg)
 
 ---
 
@@ -91,7 +89,7 @@ Three notebooks chained into a single Databricks Workflow with explicit task dep
 
 `bronze_ingest → silver_transform → gold_aggregates`
 
-![Job Run](screenshots/job_run_success.png)
+![Job Run](screenshots/job_runs.jpeg)
 
 ---
 
@@ -104,7 +102,7 @@ Four visuals built on the gold layer:
 3. **Delay cause breakdown** — carrier vs. weather vs. air-traffic-system vs. late-aircraft
 4. **Top 10 highest-risk routes** — specific origin-destination-carrier combinations
 
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/dashboard.jpeg)
 
 ---
 
@@ -118,9 +116,10 @@ flight-delay-lakehouse-databricks/
 │   ├── 02_silver_transform.py
 │   └── 03_gold_aggregates.py
 └── screenshots/
-    ├── lineage_graph.png
-    ├── job_run_success.png
-    └── dashboard.png
+    ├── lineage.jpeg
+    ├── job_runs.jpeg
+    ├── dashboard.jpeg
+    └── delay.jpeg
 ```
 
 ---
