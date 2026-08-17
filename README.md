@@ -7,9 +7,9 @@ An end-to-end data engineering pipeline on Databricks that ingests, cleans, and 
 ## Architecture
 
 ```
-                        BTS Flight Data (CSV, monthly)
-                                │
-                                ▼
+                          BTS Flight Data (CSV, monthly)
+                                  │
+                                  ▼
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────────┐
 │     BRONZE      │      │      SILVER      │      │       GOLD       │
 │  Raw ingest     │ ──▶  │  Cleaned + typed │ ──▶  │  Business aggre- │
@@ -28,8 +28,8 @@ An end-to-end data engineering pipeline on Databricks that ingests, cleans, and 
 
 **Layers:**
 - **Bronze** (`flights_project.bronze.flights_raw`) — raw CSV ingestion via Autoloader with schema evolution, lineage columns (`_ingested_at`, `_source_file`)
-- **Silver** (`flights_project.silver.flights_clean`) — typed columns, deduplicated, explicit `flight_status` (ON_TIME / DELAYED / CANCELLED / DIVERTED), derived time features
-- **Gold** (`flights_project.gold.*`) — four business-ready tables: carrier performance, airport/hour delay risk, delay-cause breakdown, route-level risk
+- **Silver** (`flights_project.silver.flights_clean`) — typed columns, deduplicated, explicit `flight_status` (ON_TIME / DELAYED / CANCELLED / DIVERTED), derived time features. Written via `MERGE INTO` (upsert on natural flight key) rather than full overwrite, so re-runs update existing records instead of rebuilding the table
+- **Gold** (`flights_project.gold.*`) — four business-ready tables: carrier performance, airport/hour delay risk, delay-cause breakdown, route-level risk. Gold intentionally stays on `overwrite` — these are small recomputed aggregates, not row-level history, so a full recompute is simpler and just as correct as incremental maintenance
 
 ---
 
@@ -86,9 +86,9 @@ Built with Unity Catalog as a first-class concern, not an afterthought:
 
 ## Orchestration
 
-Three notebooks chained into a single Databricks Workflow with explicit task dependencies:
+Four notebooks chained into a single Databricks Workflow with explicit task dependencies:
 
-`bronze_ingest → silver_transform → gold_aggregates`
+`bronze_ingest → silver_transform → gold_aggregates → data_quality_check`
 
 ![Job Run](screenshots/job_runs.jpeg)
 
@@ -104,6 +104,26 @@ Four visuals built on the gold layer:
 4. **Top 10 highest-risk routes** — specific origin-destination-carrier combinations
 
 ![Dashboard](screenshots/dashboard.jpeg)
+
+---
+
+## Data Quality Monitoring
+
+A fourth pipeline stage (`data_quality_check`, chained after `gold_aggregates`) runs automated checks every pipeline run and appends results to `flights_project.gold.data_quality_log` — a persistent audit trail, not a one-time manual check:
+
+- Row count parity between bronze and silver (catches silent data loss)
+- Null rate on critical join/dedup keys
+- Duplicate detection on the natural flight key
+- Non-empty checks on all four gold tables
+
+| Layer | Metric | Result |
+|---|---|---|
+| Bronze → Silver | Row count match | 2,360,969 = 2,360,969 ✅ |
+| Silver | `flight_date` null rate | 0.0% ✅ |
+| Silver | Duplicate key count | 0 ✅ |
+| Gold | All 4 tables non-empty | ✅ |
+
+Because the log uses `append` mode rather than `overwrite`, quality trends are queryable over time, not just as a single latest snapshot — closer to how a real observability layer behaves.
 
 ---
 
@@ -144,7 +164,8 @@ flight-delay-lakehouse-databricks/
 │   ├── 01_bronze_ingest.py
 │   ├── 02_silver_transform.py
 │   ├── 03_gold_aggregates.py
-│   └── 04_ml_delay_risk.py
+│   ├── 04_ml_delay_risk.py
+│   └── 05_data_quality_monitoring.py
 └── screenshots/
     ├── lineage.jpeg
     ├── job_runs.jpeg
@@ -162,6 +183,8 @@ flight-delay-lakehouse-databricks/
 - **Orchestration** — a working, scheduled, multi-task pipeline with dependency management, not disconnected notebooks
 - **Business-facing output** — gold-layer tables designed around real questions (which carriers are reliable, which routes/hours carry the most risk), not just raw aggregation
 - **ML integration on top of the lakehouse** — a delay-risk model trained directly on silver, validated against independently-derived gold-layer patterns, with predictions materialized as a queryable table
+- **Automated data quality monitoring** — a persistent, append-only audit log checking row parity, null rates, and duplicates on every run, rather than one-time manual verification
+- **Production-realistic write patterns** — incremental `MERGE INTO` for row-level silver data vs. deliberate `overwrite` for small recomputed gold aggregates, chosen based on what each layer actually represents
 
 ---
 
