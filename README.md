@@ -7,22 +7,22 @@ An end-to-end data engineering pipeline on Databricks that ingests, cleans, and 
 ## Architecture
 
 ```
-BTS Flight Data (CSV, monthly)
-        │
-        ▼
+                        BTS Flight Data (CSV, monthly)
+                                │
+                                ▼
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-│     BRONZE       │      │      SILVER       │      │       GOLD        │
-│  Raw ingest       │ ──▶  │  Cleaned + typed   │ ──▶  │  Business aggre-   │
-│  Autoloader        │     │  Dedup, status      │     │  gates, dashboard-  │
-│  Schema evolution   │     │  flags, derived      │     │  ready tables        │
+│     BRONZE      │      │      SILVER      │      │       GOLD       │
+│  Raw ingest     │ ──▶  │  Cleaned + typed │ ──▶  │  Business aggre- │
+│  Autoloader     │      │  Dedup, status   │      │  gates, dashboard│
+│ Schema evolution│      │  flags, derived  │      │  ready tables    │
 └─────────────────┘      └──────────────────┘      └──────────────────┘
         │                          │                          │
         └──────────────────────────┴──────────────────────────┘
-                                    │
+                                   │
                     Unity Catalog (governance) +
                 Databricks Workflows (orchestration)
-                                    │
-                                    ▼
+                                   │
+                                   ▼
                      Databricks SQL Dashboard
 ```
 
